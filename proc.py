@@ -1,5 +1,5 @@
 ﻿import argparse
-import random
+from random import randrange as rand
 import re
 import json
 
@@ -13,6 +13,36 @@ IP = {2}
     print('\n'.join([('%04X: ' % s) + ' '.join(['%02X' % i for i
           in memory[s:s + 16]]) for s in range(0, 100, 16)]))
 
+
+def decode(КОП):
+    ОП = wires['КОП'] >> 4
+    opt = wires['КОП'] & 15
+    if (ОП == 15):
+        П = 4
+        И = 1
+        if (opt == 14):
+            set_wire('перех', 1)
+        elif (opt != 15):
+            set_wire('перех', РОН[opt])
+    else:
+        П = opt & 3
+        И = opt >> 2
+        set_wire('перех', 0)
+    return [ОП, И, П]
+
+
+def read_word(addr):
+    return memory[addr] << 8 | memory[addr + 1]
+
+
+def set_wire(wire, value):
+    wires[wire] = config[wire] and value
+
+
+def choose_wire(*input, key):
+    return [wires[i] for i in input][wires[key]]
+
+
 parser = argparse.ArgumentParser(description=' Copyright (C) Alexander Morgun'
                                  ' <Alexander_Morgun@e1.ru>')
 parser.add_argument('file', type=argparse.FileType('r'), nargs=1,
@@ -22,65 +52,53 @@ parser.add_argument('-d', action='store_true',
 args = parser.parse_args()
 config = json.loads(open('config', mode='r').read())
 t = 0
-memory = [random.randrange(255) for i in range(65535)]
+memory = [rand(255) for i in range(65535)]
 for i in re.findall('(\w{2})', args.file[0].read(-1)):
     memory[t] = int(i, base=16)
     t += 1
 IP = 0
+wires = {'0': 0}
 # флаг Пр 0x, флаг Пр x0, СУМ
-РОН = [random.randrange(255) for i in range(3)]
-ИР = random.randrange(255)
-пуск = config['пуск'] and True
-while (пуск):
-    КОП = config['КОП'] and memory[IP]
-    Адрес = config['А'] and (memory[IP + 1] * 256 + memory[IP + 2])
-    ОП = КОП // 16
-    перех = 0
-    if (ОП == 15):
-        П = 4
-        И = 1
-        if (КОП % 16 == 14):
-            перех = 1
-        elif (КОП % 16 != 15):
-            перех = РОН[КОП % 16]
-    else:
-        П = int(КОП % 16) % 4
-        И = (КОП % 16) // 4
-    перех = config['перех'] and перех
-    пуск = config['пуск'] and КОП != 255
-    взап1 = config['взап1'] and П == 3
-    зам1 = config['зам1'] and П == 1
-    зам2 = config['зам2'] and П != 3
-    чист = config['чист'] and not (П == 2 or П == 3)
-    выб = config['выб'] and И
-    запп = config['запп'] and П == 0
-    # print("{0}:{1} {2} {3} {4}".format(КОП, ОП, И, П, Адрес))
-    ИНД = config['ИНД'] and ИР
-    ИА = config['ИА'] and (ИНД + Адрес)
-    СП = memory[ИА] * 256 + memory[ИА + 1]
-    АЛУ_вход0 = [СП, ИА, ИНД][выб]
-    # print("[{0} {1} {2}][{3}]".format(СП, ИА, ИНД, выб))
-    СУМ = config['СУМ'] and РОН[2]
-    АЛУ_вход1 = СУМ
-    РЕЗ1 = config['РЕЗ1'] and {
+РОН = [rand(255) for i in range(3)]
+ИР = rand(255)
+set_wire('пуск', True)
+while (wires['пуск']):
+    set_wire('КОП', memory[IP])
+    set_wire('Адрес', read_word(IP + 1))
+    [ОП, И, П] = decode(wires['КОП'])
+    set_wire('пуск', wires['КОП'] != 255)
+    set_wire('взап1', П == 3)
+    set_wire('зам1', П == 1)
+    set_wire('зам2', П != 3)
+    set_wire('чист', not (П == 2 or П == 3))
+    set_wire('выб', И)
+    set_wire('запп', П == 0)
+    set_wire('ИНД', ИР)
+    set_wire('ИА', wires['ИНД'] + wires['Адрес'])
+    set_wire('СП', read_word(wires['ИА']))
+    set_wire('СУМ', РОН[2])
+    АЛУ_вход0 = choose_wire('СП', 'ИА', 'ИНД', key='выб')
+    АЛУ_вход1 = wires['СУМ']
+    set_wire('РЕЗ1', {
         0: lambda x, y: y,  # WTF?!
         1: lambda x, y: x,
         2: lambda x, y: x + y,
         3: lambda x, y: y - x,
         15: lambda x, y: y,  # WTF?!
-    }[ОП](АЛУ_вход0, АЛУ_вход1)
-    ПР = [config['ПР'] and РЕЗ1 == 0, config['ПР'] and РЕЗ1 > 0]
+    }[ОП](АЛУ_вход0, АЛУ_вход1))
+    set_wire('ПР', (wires['РЕЗ1'] == 0) << 2 | (wires['РЕЗ1'] > 0))
     if (args.d):
+        print(wires['Адрес'])
+        print(config['Адрес'])
         dump()
-    if (зам1):
-        РОН[:2] = ПР
-        РОН[2] = РЕЗ1
-    if (зам2):
-        ИР = [РЕЗ1, 0][чист]
-    if (запп):
-        memory[ИА] = (РЕЗ1 // 256) % 256
-        memory[ИА + 1] = РЕЗ1 % 256
-    IP += 3
-    if (пуск):
-        IP = [IP, ИА][перех]
+    if (wires['зам1']):
+        РОН = [wires['ПР'] >> 2, wires['ПР'] & 3, wires['РЕЗ1']]
+    if (wires['зам2']):
+        ИР = choose_wire('РЕЗ1', '0', key='чист')
+    if (wires['запп']):
+        memory[wires['ИА']] = wires['РЕЗ1'] >> 16
+        memory[wires['ИА'] + 1] = wires['РЕЗ1'] & 255
+    set_wire('АДРКОМ', IP + 3)
+    if (wires['пуск']):
+        IP = choose_wire('АДРКОМ', 'ИА', key='перех')
 dump()
