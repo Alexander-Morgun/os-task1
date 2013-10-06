@@ -88,15 +88,13 @@ while (wires['пуск']):
     }[ОП](АЛУ_вход0, АЛУ_вход1))
     set_wire('ПР', (wires['РЕЗ1'] == 0) << 2 | (wires['РЕЗ1'] > 0))
     if (args.d):
-        print(wires['Адрес'])
-        print(config['Адрес'])
         dump()
     if (wires['зам1']):
         РОН = [wires['ПР'] >> 2, wires['ПР'] & 3, wires['РЕЗ1']]
     if (wires['зам2']):
         ИР = choose_wire('РЕЗ1', '0', key='чист')
     if (wires['запп']):
-        memory[wires['ИА']] = wires['РЕЗ1'] >> 16
+        memory[wires['ИА']] = wires['РЕЗ1'] >> 8
         memory[wires['ИА'] + 1] = wires['РЕЗ1'] & 255
     set_wire('АДРКОМ', IP + 3)
     if (wires['пуск']):
