@@ -6,10 +6,11 @@ import json
 
 def dump():
     print("""
-POH = {0}
-IR = {1}
-IP = {2}
-    """.format('|'.join([str(int(i)) for i in РОН]), ИР, IP))
+Flags = {0} {1}
+POH = {2}
+IR = {3}
+IP = {4}
+    """.format(РОН[0], РОН[1], РОН[2], ИР, IP))
     print('\n'.join([('%04X: ' % s) + ' '.join(['%02X' % i for i
           in memory[s:s + 16]]) for s in range(0, 100, 16)]))
 
